@@ -66,3 +66,21 @@ Enumerate GPO associated to a gplink, the name of the GPO is something like this
 ```
 Get-DomainGPO -Identity '{GPO_name}'
 ```
+
+### Enumerate ACLs using PowerView.ps1
+Enumerate the Domain ACLs
+```
+Get-DomainObjectACL -Identity "Domain Admins" -ResolveGUIDs -verbose
+```
+
+Enumerate the AD rights for a specific user
+```
+Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<username>"}
+```
+
+Check if AD rights are binded to a specific group instead of users
+```
+Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<Group_name>"}
+```
+
+
