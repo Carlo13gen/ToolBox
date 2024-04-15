@@ -83,4 +83,17 @@ Check if AD rights are binded to a specific group instead of users
 Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<Group_name>"}
 ```
 
+### Enumerate the Domain Trust
+Enumerate all the domains in the forest
+```
+Get-ForestDomain -Verbose
+```
+
+Map the trust of the current domain, choose the trust attribute basing on the available ones
+```
+Get-ForestDomain | %{Get-DomainTrust -Domain $_.Name} | ?{$_.TrustAttributes -eq "<Trust_attribute>"}
+```
+
+
+
 
