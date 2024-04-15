@@ -146,6 +146,26 @@ nc64.exe -lvp 443
 
 **Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
 
+## BloodHound
+### Install neo4j
+Open cmd as Administrator and open the following directory
+```
+cd C:\AD\Tools\neo4j-community-4.1.1-windows\neo4j-community-4.1.1\bin
+```
+
+Install neo4j
+```
+neo4j.bat install-service
+```
+
+Start neo4j service
+```
+neo4j.bat start 
+```
+
+Browse to http://localhost:7474 and login using the following credentials
+user: neo4j
+password: bloodhound
 
 
 
