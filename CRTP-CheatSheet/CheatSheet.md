@@ -35,3 +35,34 @@ Enumerate the Enterprise Admins, we need to query the master DC of the forest
 ```
 Get-DomainGroupMember -Identity "Enterprise Admins" -Domain <forestname>
 ```
+
+### Enumerate the GPOs using PowerView.ps1
+Enumerate the organization unit (OU)
+```
+Get-DomainOU
+```
+
+Enumerate only the OU names
+```
+Get-DomainOU | select name
+```
+
+List all the computers in an OU
+```
+(Get-DomainOU -Identity <OU>).distinguishedname | %{Get-DomainComputer -SearchBase $_} | select name
+```
+
+Enumerate all the Domain GPO
+```
+Get-DomainGPO
+```
+
+Enumerate the GPO for a specific OU
+```
+(Get-DomainOU -Identity <OU>).gplink
+```
+
+Enumerate GPO associated to a gplink, the name of the GPO is something like this {7478F170-6A0C-490C-B355-9E4618BC785D}
+```
+Get-DomainGPO -Identity '{GPO_name}'
+```
