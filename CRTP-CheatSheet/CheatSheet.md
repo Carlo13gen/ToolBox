@@ -69,6 +69,88 @@ Enumerate the Applocker policies
 Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
 ```
 ## Enumeration
+### Domain Enumeration Using ActiveDirectory Module
+Enumerate current domain 
+```
+Get-ADDomain
+```
+
+Enumerate object of another domain
+```
+Get-ADDomain -Identity <domain>
+```
+
+Get domain SID for the current domain
+```
+(Get-ADDomain).DomainSID
+```
+
+Get Domain Policy for the current domain
+```
+(GetDomainPolicyData).systemaccess
+```
+
+Get Domain Policy for another domain
+```
+(GetDomainPolicyData -domain <domain>).systemaccess
+```
+
+Get domain controllers for the current domain
+```
+Get-ADDomainController
+```
+
+Get domain controllers for another domain
+```
+Get-ADDomainController -DomainName <domain> -Discover
+```
+
+Get list of users of the current domain
+```
+Get-ADUser -Filter * -Properties *
+Get-ADUser -Identity <username> -Properties *
+```
+
+Get list of all properties for users in the current domain
+```
+Get-ADUser -Filter * -Properties * | select -First 1 | Get-Memeber -MemberType *Property | select Name
+Get-ADUser -Filter * -Properties * | select name,logoncount,@{expression={[datetime]::fromFileTime($_.pwdlastser)}}
+```
+
+Look for particular string in a user's attribute
+```
+Get-ADUser -Filter 'Description -like "*built*"' -Properties Description | select name,Description
+```
+
+Get list of computers in the current domain
+```
+Get-ADComputer -Filter * | select Name
+Get-ADComputer -Filter * -Properties *
+Get-ADComputer -Filter 'OperatingSystem -like "*Server 2022*"' -Properties OperatinSystem | selct Name,OperatingSystem
+Get-ADComputer -Filter * -Properties DNSHostName | %{Test-Connection -Count 1 -ComputerName $_.DNSHostName}
+```
+
+Get all the groups in the current domain
+```
+Get-ADGroup -Filter * | select Name
+Get-ADGroup -Filter * -Properties *
+```
+
+Get all the groups containing the world "admin" in group name
+```
+Get-ADGroup -Filter 'Name -like "*admin*" | select Name
+```
+
+Get all the members of Domain Admin group
+```
+Get-ADGroupMember -Identity "Domain Admins" -Recursive
+```
+
+Get the group membership for a user
+```
+Get-ADPricipalGroupMembership -Identity <username>
+```
+
 ### Domain Enumeration Using PowerView.ps1
 Enumeration of domain information
 ```
