@@ -245,6 +245,36 @@ Map the trust of the current domain, choose the trust attribute basing on the av
 Get-ForestDomain | %{Get-DomainTrust -Domain $_.Name} | ?{$_.TrustAttributes -eq "<Trust_attribute>"}
 ```
 
+### Enumeration of Local Groups
+
+List all the local groups on a machine
+```
+Get-NetLocalGroup -ComputerName <machine_name>
+```
+
+Get members of the local group "Administrator" on a machine
+```
+Get-NetLocalGroupMember -ComputerName <machine_name> -GroupName Administrator
+```
+
+Get actively logged users on a computer
+```
+Get-NetLoggedon -ComputerName <machine_name>
+```
+
+Get locally logged users on a computer (needs remote registry on the target - started by default on server OS)
+```
+Get-LoggedonLocal -ComputerName <machine_name>
+```
+
+Get the last logged user on a computer 
+```
+Get-LastLoggedOn -ComputerName <machine_name>
+```
+**NOTE:** all of this commands need administrative privileges on non-dc machines or on target to be run
+
+### Enumerate Shares and Files
+
 ## Privilege Escalation
 ### Local Admin Privilege Escalation using PowerUp.ps1
 Load the PowerUp.ps1 module
