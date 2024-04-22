@@ -151,6 +151,34 @@ Get the group membership for a user
 Get-ADPricipalGroupMembership -Identity <username>
 ```
 
+**Domain Enumeration Trust**
+Get a list of all domain trusts for the current domain
+```
+Get-ADTrust
+Get-ADTrust -Identity <domain>
+```
+
+Get details about the current forest
+```
+Get-ADForest
+Get-ADForest -Identity <domain>
+```
+
+Get all domains in the current forest
+```
+(Get-ADForest).Domains
+```
+
+Get global catalogs for the current forest
+```
+Get-ADForest | select -ExpandProperty GlobalCatalogs
+```
+
+Get trusts of a forest
+```
+Get-ADTrust -Filter 'msDS-TrustForestTrustInfo -ne "$null"'
+```
+
 ### Domain Enumeration Using PowerView.ps1
 Enumeration of domain information
 ```
@@ -187,7 +215,7 @@ Enumerate the Enterprise Admins, we need to query the master DC of the forest
 Get-DomainGroupMember -Identity "Enterprise Admins" -Domain <forestname>
 ```
 
-### Enumerate the GPOs using PowerView.ps1
+**Enumerate the GPOs using PowerView.ps1**
 Enumerate the organization unit (OU)
 ```
 Get-DomainOU
@@ -218,7 +246,7 @@ Enumerate GPO associated to a gplink, the name of the GPO is something like this
 Get-DomainGPO -Identity '{GPO_name}'
 ```
 
-### Enumerate ACLs using PowerView.ps1
+**Enumerate ACLs using PowerView.ps1**
 Enumerate the Domain ACLs
 ```
 Get-DomainObjectACL -Identity "Domain Admins" -ResolveGUIDs -verbose
@@ -234,7 +262,7 @@ Check if AD rights are binded to a specific group instead of users
 Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<Group_name>"}
 ```
 
-### Enumerate the Domain Trust using PowerView.ps1
+**Enumerate the Domain Trust using PowerView.ps1**
 Enumerate all the domains in the forest
 ```
 Get-ForestDomain -Verbose
@@ -245,7 +273,7 @@ Map the trust of the current domain, choose the trust attribute basing on the av
 Get-ForestDomain | %{Get-DomainTrust -Domain $_.Name} | ?{$_.TrustAttributes -eq "<Trust_attribute>"}
 ```
 
-### Enumeration of Local Groups
+**Enumeration of Local Groups**
 
 List all the local groups on a machine
 ```
@@ -273,7 +301,22 @@ Get-LastLoggedOn -ComputerName <machine_name>
 ```
 **NOTE:** all of this commands need administrative privileges on non-dc machines or on target to be run
 
-### Enumerate Shares and Files
+**Enumerate Shares and Files**
+
+Find shares on hosts in current domain
+```
+Invoke-ShareFinder -Verbose
+```
+
+Find sensitive files on computers in the domain
+```
+Invoke-FileFinder -Verbose
+```
+
+Get all fileservers on the domain
+```
+Get-NetFileServer
+```
 
 ## Privilege Escalation
 ### Local Admin Privilege Escalation using PowerUp.ps1
@@ -313,7 +356,6 @@ Perform the enumeration
 ```
 Find-PSRemotingLocalAdminAccess
 ```
-
 
 ## Reverse-Shells
 Command to download and execute a reverse-shell
