@@ -350,7 +350,7 @@ password: bloodhound
 
 ## Privilege Escalation
 ### Useful tools 
-- [PowerUP](#https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1)
+- [PowerUP](https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1)
 ### Local Admin Privilege Escalation using PowerUp
 Load the PowerUp.ps1 module
 ```
