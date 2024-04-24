@@ -1,4 +1,9 @@
 # CheatSheet
+## Index
+* [General](#general)
+* [Enumeration](#enumeration)
+  * [Enumeration using AD Module](#domain-enumeration-using-activedirectory-module)
+
 ## General
 Connect to a machine with Administrator privileges
 ```
