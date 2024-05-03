@@ -1,4 +1,4 @@
-![image](https://github.com/Carlo13gen/ToolBox/assets/49983711/50297583-6fe7-49da-ba95-6fa45b0813dc)![image](https://github.com/Carlo13gen/ToolBox/assets/49983711/0646e977-9c6e-45f0-845e-9cc7a7db1ec8)# CheatSheet
+# CheatSheet
 ## Index
 * [General](#general)
   * [Port Forwarding](#create-a-port-forwarding)
