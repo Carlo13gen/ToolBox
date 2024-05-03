@@ -23,7 +23,7 @@
   * [DSRM](#persistence-using-dsrm)
   * [ACLs AdminSDHolder](#persistence-using-acls-adminsdholder)
   * [ACLs Rights Abuse](#persistence-using-acls-rights-abuse)
-  * [ACLs Security Descriptors](#persistence-using-security-descriptors)
+  * [ACLs Security Descriptors](#persistence-using-acls-security-descriptors)
  
   
 <div style="page-break-after: always;"></div>
