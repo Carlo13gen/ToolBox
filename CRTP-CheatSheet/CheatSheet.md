@@ -759,7 +759,7 @@ C:\AD\Tools\Rubeus.exe asktgs /service:http/<parent_domain_controller.domain> /d
 | /sid | SID of the current domain |
 | /sids | SID of the enterprise admins group of the parent domain |
 | /rc4 | RC4 of the trust key |
-| ldap | Retrieve PAC information from the current DC |
+| /ldap | Retrieve PAC information from the current DC |
 | /user | user to impersonate |
 | /nowrap | no newlines in the output |
 
