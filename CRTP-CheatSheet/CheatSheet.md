@@ -269,6 +269,7 @@ Get-DomainGroupMember -Identity "Enterprise Admins" -Domain <forestname>
 ```
 
 **Enumerate the GPOs using PowerView.ps1**
+
 Enumerate the organization unit (OU)
 ```
 Get-DomainOU
