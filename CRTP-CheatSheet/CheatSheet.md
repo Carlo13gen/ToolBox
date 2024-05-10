@@ -132,6 +132,17 @@ with the command below it is possible to convert a .pem certificate in a .pfx on
 C:\AD\Tools\openssl\openssl.exe pkcs12 -in C:\AD\Tools\AdministratorCerificate.pem -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out C:\AD\Tools\esc1-DA.pfx
 ```
 
+### Check Whitelisted Paths
+This command will provide the applocker constraints also for scripts
+```
+reg query HKLM\Software\Policies\Microsoft\Windows\SRVP2
+```
+
+Using the following command it is possible to check in which locations scripts execution is allowed
+```
+Get-ApplockerPolicy -Effective | select -ExpandProperty RuleCollections
+```
+
 <div style="page-break-after: always;"></div>
 
 ## Enumeration
